@@ -38,19 +38,16 @@ ___  __             ___  __   __                __   __  ___
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 
-/*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------*//*
 
 The code for this project has been split into 7 segments:
 Segment 1: Variables, pins, and constraints 
 Segment 2: Sensors
 Segment 3: Movement (includes further segregation into sub parts)
-Segment 4:End of Maze Celebration
+Segment 4: End of Maze Celebration
 Segment 5: Exploration loop for finding the way to the end of the maze
 Segment 6: Mapping and localisation
 Segment 7: Setup() and loop()
-
-
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -79,44 +76,52 @@ mbed::PwmOut MotorBPwm(P1_2); //Set PWM pin for motor B
 //encoders and distancing:
 
 mbed::InterruptIn EncA(P1_11); //Left wheel encoder pin declaration
-long int ShaftRevA; // Counts how many full rotations of motor A there have been
-long int EncCountA; // Counts pulses of motor A encoder
+long int ShaftRevA; // Stores how many full rotations of motor A there have been
+long int EncCountA; // Stored number of pulses of motor A encoder
+
 mbed::InterruptIn EncB(P1_12); //Left wheel encoder pin declaration
-long int ShaftRevB; // Counts how many full rotations of motor B there have been
-long int EncCountB; // Counts pulses of motor B encoder
+long int ShaftRevB; // Stored how many full rotations of motor B there have been
+long int EncCountB; // Stores numer of pulses of motor B encoder
+
 long int BothEncCount; // increments when both wheels have moved equal distance.
+
 float Distance; // used to find the distance travelled of a wheel in the distance function
 float TargetDist; // Target Distance for the GoThisFar function.
+const float ENCODER_TICKS_PER_MM = 2.18383082;
+
+
 
 // speed and squareup related:
 
-float Speed = 0.5f; //general motor speed unless squaring up.
-float Ramp = 0.005; //ramp for the ramp up function.
-float SquareSpeed = 0.35f; // speed during SquareUp functions.
+const float SPEED = 0.5f; //general motor speed unless squaring up.
+const float RAMP = 0.005; //ramp for the ramp up function.
+const float SQUARE_SPEED = 0.35f; // speed during SquareUp functions.
 bool Square; //used to check whether the robot is currently square with a wall.
 int StuckCounter = 0; //used to check if the robot is stuck.
 int TimeOut = 0; //used to stop the robot from getting stuck in a squareup loop when squaring isn't possible.
 
+
 //Ultrasonic Sensor Pins.
-const int Ultra1Pin = 7;
+const int ULTRA_1_PIN = 7;
 int Ultra1Dist = 0;
-const int Ultra2Pin = 4;
+const int ULTRA_2_PIN = 4;
 int Ultra2Dist = 0;
-const int Ultra3Pin = 5;
+const int ULTRA_3_PIN = 5;
 int Ultra3Dist = 0;
-const int Ultra4Pin = 6;
+const int ULTRA_4_PIN = 6;
 int Ultra4Dist = 0;
 
 int UltraPin;
 int FrontDist = 0;
 
+
 //IR sensor variables
-float OffSet = 0.27; // acceptable varience in sensors for squareup.
+const float OFFSET = 0.27; // acceptable varience in sensors for squareup.
 mbed::I2C i2c(P0_31, P0_2); // pin declaration for I2C.
-const char BackLeft = 0x01;
-const char BackRight = 0x02;
-const char FrontRight = 0x04;
-const char FrontLeft = 0x08;
+const char BACK_LEFT = 0x01;
+const char BACK_RIGHT = 0x02;
+const char FRONT_RIGHT = 0x04;
+const char FRONT_LEFT = 0x08;
 
 
 //Localisation
@@ -150,17 +155,18 @@ class GlobalStuff {
 
 GlobalStuff Localisation;
 
+
 //Mapping
 float MovesToEnd[150] = {}; //array for storing what moves the robot took to get to the end
 float MovesBackToStart[150] = {}; //array for reversing the moves taken in order to get back to the start
 int CurrentMove = 0; //counts how many moves the robot has taken so far
 int MapReversalCounter = 0; //counts how many moves have been reversed so far
 // since array is storing floats, unreasonable values will be used to store the commands for a left turn, right turn, square up or reverse. 
-// 2000 will be a Left Turn. 3000 will be a right turn. 4000 will be squaring up on the left wall. 5000 will be squaring up on the left wall.
-int Left = 2000;
-int Right = 3000;
-int SquareLeft = 4000;
-int SquareRight = SquareRight;
+// 2000 will be a Left Turn. 3000 will be a right turn. 4000 will be squaring up on the left wall. 5000 will be squaring up on the right wall.
+const int LEFT = 2000;
+const int RIGHT = 3000;
+const int SQUARE_LEFT = 4000;
+const int SQUARE_RIGHT = 5000;
 
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -176,14 +182,11 @@ int SquareRight = SquareRight;
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
-
-
-
 // Infrared functions.
 
 float IRSensor(char mux_cmd){
-  const char mux_addr = 0xEE; //multiplexer address.
-  i2c.write(mux_addr, &mux_cmd, 1);
+  const char MUX_ADDR = 0xEE; //multiplexer address.
+  i2c.write(MUX_ADDR, &mux_cmd, 1);
   char cmd[2]; //character array for IR sensors.
   cmd[0] = 0x5E;
   cmd[1] = 0x00;
@@ -204,6 +207,7 @@ float AverageIRSensor(char Sensor){ //take 25 readings from the IR sensor and av
   return AverageReading;
   
 }
+
 
 /*Ultrasonic sensor code adapted from the arduino ide example code for the Ping ultrasonic sensor (File -> Examples -> Sensors -> Ping)
 created 3 Nov 2008 by David A. Mellis
@@ -238,32 +242,32 @@ long UltraSensor(int UltraPin){
 }
 
 int CheckFront(){
-  int FrontLeft = UltraSensor(Ultra1Pin); //check if there is a wall in front using ultrasonic.
+  int LeftFront = UltraSensor(ULTRA_1_PIN); //check if there is a wall in front using ultrasonic.
   delay(200);
-  int FrontRight = UltraSensor(Ultra3Pin); //check if there is a wall in front using ultrasonic
-  if(FrontLeft < 20 && FrontRight < 20){
-    int FrontDiff = abs(FrontLeft - FrontRight); //see if the values are similar, they are
-    if(FrontDiff < 8){
-      float FrontDist = (FrontLeft + FrontRight)/2;
+  int RightFront = UltraSensor(ULTRA_3_PIN); //check if there is a wall in front using ultrasonic
+  if(LeftFront < 20 && RightFront < 20){
+    int FrontDiff = abs(LeftFront - RightFront); //Find the difference between the 2 values
+    if(FrontDiff < 8){ //see if the values are similar, they are (difference betweeen them is low)
+      float FrontDist = (LeftFront + RightFront)/2;
 
       return FrontDist;
     }
-    else{
-      ReverseThisFar(10.0);
+    else{ //the values aren't similar so at least one of them is very off
+      ReverseThisFar(10.0); //move a little and try again.
       Serial.println("retry");
       CheckFront();
     }
   }
-  else if(FrontLeft < 20 && FrontRight >= 20 && FrontRight <= 900){
-    FrontDist = FrontLeft;
+  else if(LeftFront < 20 && RightFront >= 20 && RightFront <= 900){ //If the front left sensor is sayin there is a wall close by and the front right says there isn't
+    FrontDist = LeftFront; //Ignore the front right and act as if there is a wall
     return FrontDist;
   }
-  else if(FrontRight < 20 && FrontLeft >= 20 && FrontLeft <= 900){
-    FrontDist = FrontRight;
+  else if(RightFront < 20 && LeftFront >= 20 && LeftFront <= 900){ //If there is a wall in front of right but not left.
+    FrontDist = RightFront; //Ignore front left and act as if there is a wall.
     return FrontDist;
   }
-  else{
-    FrontDist = FrontLeft;
+  else{ //Both values are over 20, there isn't a wall nearby 
+    FrontDist = LeftFront; //Doesn't matter which one you use since result is the same. Use Left (picked because the robot is more likely to get caught on the left side.)
     return FrontDist;
   }
 
@@ -318,7 +322,7 @@ void countPulseA(){ // counts the encoder pulses of wheel A.
   countRevA(); //calls function that tracks revolutions.
 }
 void countPulseB(){ // same as previous function but for wheel B.
-   if(MotorBDir == 1)
+   if(MotorBDir == 1) //Direction is flipped because the motor is facing a different way. Therefore "1" is in opposite directions for each motor.
      EncCountB++;
    else
      EncCountB--;
@@ -341,11 +345,11 @@ void countRevB(){// same as CountRevA but for wheel B.
 }
 
 float DistanceA(){ //finds the distance travelled by wheel A.
-  return Distance = EncCountA / 2.18383082; //660 / (48.1 * pi *2) = 2.18383082 which is the encoder ticks per mm of distance travelled.
+  return Distance = EncCountA / ENCODER_TICKS_PER_MM; //660 / (48.1 * pi *2) = ENCODER_TICKS_PER_MM which is the encoder ticks per mm of distance travelled.
 }
 
 float DistanceB(){ //same as above but for B.
-  return Distance = EncCountB / 2.18383082;
+  return Distance = EncCountB / ENCODER_TICKS_PER_MM;
 }
 
 float FindDistanceTravelled(){
@@ -360,12 +364,15 @@ float FindDistanceTravelled(){
 
 /*Subsection 3.2: Straight line movements forwards and backwards.*/
 
+/*GoThisFar and ReverseThisFar could in theory be merged but that may cause issues with mapping and adds a higher level of complication
+than I feel is necessary.*/
+
 /*-----------------------------------------------------------------------------------------------*/
 void GoThisFar(float TargetDist){ //function to move in a straight line for a set distance (in millimeters)
   EncCountA = 0; //reset encoder values
   EncCountB = 0;
   BothEncCount = 0;
-  while(BothEncCount < (TargetDist * 2.18383082)){ //2.18... is the number of encoder ticks per mm. multiplying by the number of mm the robot should go gives the final encoder count the robot should have
+  while(BothEncCount < (TargetDist * ENCODER_TICKS_PER_MM)){ //2.18... is the number of encoder ticks per mm. multiplying by the number of mm the robot should go gives the final encoder count the robot should have
     EncA.rise(&countPulseA); //update encoders
     EncB.rise(&countPulseB);
     MotorADir = 0; //assign wheel directions to go forwards.
@@ -373,15 +380,15 @@ void GoThisFar(float TargetDist){ //function to move in a straight line for a se
 
     if (EncCountA > EncCountB){ //comparisons to make sure one wheel doesn't travel faster than the other. when one wheel overtakes the other, it is momentarily turned off so the other can catch up.
       MotorAPwm.write(0.0f);
-      MotorBPwm.write(Speed);
+      MotorBPwm.write(SPEED);
     }
     else if(EncCountA < EncCountB){
-      MotorAPwm.write(Speed);
+      MotorAPwm.write(SPEED);
       MotorBPwm.write(0.0f);
     }
     else if (EncCountA == EncCountB){
-      MotorAPwm.write(Speed);
-      MotorBPwm.write(Speed);
+      MotorAPwm.write(SPEED);
+      MotorBPwm.write(SPEED);
       BothEncCount = EncCountA; //when both encoder counts are equal, the robot must have travelled that far and can be compared with the target encoder value.
     }
     CheckIfStuck(); //check whether the wheels are actually moving or not.
@@ -421,7 +428,7 @@ void ReverseThisFar(float TargetDist){ //same as GoThisFar but in reverse. Direc
   EncCountA = 0;
   EncCountB = 0;
   BothEncCount = 0;
-  while(BothEncCount > -(TargetDist * 2.18383082)){
+  while(BothEncCount > -(TargetDist * ENCODER_TICKS_PER_MM)){
     EncA.rise(&countPulseA);
     EncB.rise(&countPulseB);
     MotorADir = 1;
@@ -429,15 +436,15 @@ void ReverseThisFar(float TargetDist){ //same as GoThisFar but in reverse. Direc
 
     if (EncCountA < EncCountB){
       MotorAPwm.write(0.0f);
-      MotorBPwm.write(Speed);
+      MotorBPwm.write(SPEED);
     }
     else if(EncCountA > EncCountB){
-      MotorAPwm.write(Speed);
+      MotorAPwm.write(SPEED);
       MotorBPwm.write(0.0f);
     }
     else if (EncCountA == EncCountB){
-      MotorAPwm.write(Speed);
-      MotorBPwm.write(Speed);
+      MotorAPwm.write(SPEED);
+      MotorBPwm.write(SPEED);
       BothEncCount = EncCountA;
     }
   }
@@ -476,7 +483,7 @@ void TurnLeft(){ //Turns 90 degrees left.
   MotorADir = 1; //motor A goes backwards
   MotorBDir = 1; // motor B goes Forwards.
 
-  while(EncCountA > -155){ //90mm between the wheels. want to trace out 1/4 of a circle with radius 45mm. circumferance = 2pi *r. therefore target distance is 70.68583471mm. Multiply by 2.18383082 for desired encoder value (154). Shave some off to account for inertia.
+  while(EncCountA > -155){ //90mm between the wheels. want to trace out 1/4 of a circle with radius 45mm. circumferance = 2pi *r. therefore target distance is 70.68583471mm. Multiply by ENCODER_TICKS_PER_MM for desired encoder value (154). Shave some off to account for inertia.
 
     EncA.rise(&countPulseA); //update encoders
     EncB.rise(&countPulseB);
@@ -509,7 +516,7 @@ void TurnLeft(){ //Turns 90 degrees left.
   else if(Localisation.GetDirection() == "South"){
     Localisation.SetDirection("East");
   }
-  AddToMap(Left);
+  AddToMap(LEFT);
 }
 
 
@@ -519,7 +526,7 @@ void TurnRight(){
   MotorADir = 0; //motor A goes forwards
   MotorBDir = 0; //motor B goes backwards
 
-  while(EncCountB > -155){ //90mm between the wheels. want to trace out 1/4 of a circle with radius 45mm. circumferance = 2pi *r. therefore target distance is 70.68583471mm. Multiply by 2.18383082 for desired encoder value (154). Shave some off to account for inertia.
+  while(EncCountB > -155){ //90mm between the wheels. want to trace out 1/4 of a circle with radius 45mm. circumferance = 2pi *r. therefore target distance is 70.68583471mm. Multiply by ENCODER_TICKS_PER_MM for desired encoder value (154). Shave some off to account for inertia.
 
     EncA.rise(&countPulseA); //update encoders
     EncB.rise(&countPulseB);
@@ -552,7 +559,7 @@ void TurnRight(){
   else if(Localisation.GetDirection() == "South"){
     Localisation.SetDirection("West");
   }
-  AddToMap(Right);
+  AddToMap(RIGHT);
 }
 /*-----------------------------------------------------------------------------------------------
 
@@ -565,10 +572,10 @@ void SquareUpLeft() { //Squares up with left wall. Squares up perfectly so long 
   Square = false;
   TimeOut = 0; //timeout is used to limit the time the robot can spend trying to square up so that it doesn't get caught in a loop when squaring isn't possible.
   while (Square == false) {
-    float FL = IRSensor(FrontLeft); //check front left IR sensor.
-    float BL = IRSensor(BackLeft); //check back left IR sensor
+    float FL = IRSensor(FRONT_LEFT); //check front left IR sensor.
+    float BL = IRSensor(BACK_LEFT); //check back left IR sensor
     //check whether angle is within acceptable varience (if the sensors are within the offset value of each other then its more or less straight)
-    if (FL > BL + OffSet) { // check is the front sensor is further from the wall than the back sensor. (if its square then they should be roughly the same)
+    if (FL > BL + OFFSET) { // check is the front sensor is further from the wall than the back sensor. (if its square then they should be roughly the same)
       EncCountA = 0; 
       EncCountB = 0;
       MotorADir = 1;
@@ -578,19 +585,19 @@ void SquareUpLeft() { //Squares up with left wall. Squares up perfectly so long 
 
       if (EncCountA < -EncCountB) { //see TurnLeft explaination.
         RampSpeedB(0.0f);
-        RampSpeedA(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
       } else if (EncCountA > -EncCountB) {
-        RampSpeedB(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
         RampSpeedA(0.0f);
       } else if (EncCountA == -EncCountB) {
-        RampSpeedB(SquareSpeed);
-        RampSpeedA(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
+        RampSpeedA(SQUARE_SPEED);
         BothEncCount = EncCountA;
       }
     }
 
 
-    else if (BL > FL + OffSet) { // check is the back sensor is further from the wall than the front sensor. (if its square then they should be roughly the same)
+    else if (BL > FL + OFFSET) { // check is the back sensor is further from the wall than the front sensor. (if its square then they should be roughly the same)
       EncCountA = 0;
       EncCountB = 0;
       MotorADir = 0;
@@ -599,13 +606,13 @@ void SquareUpLeft() { //Squares up with left wall. Squares up perfectly so long 
       EncB.rise(&countPulseB);
       if (EncCountB < -EncCountA) { //see RightTurn explaination.
         RampSpeedA(0.0f);
-        RampSpeedB(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
       } else if (EncCountB > -EncCountA) {
-        RampSpeedA(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
         RampSpeedB(0.0f);
       } else if (EncCountB == -EncCountA) {
-        RampSpeedA(SquareSpeed);
-        RampSpeedB(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
+        RampSpeedB(SQUARE_SPEED);
         BothEncCount = EncCountA;
       }
     } else { //it is within the acceptable range.
@@ -621,19 +628,19 @@ void SquareUpLeft() { //Squares up with left wall. Squares up perfectly so long 
       SquareUpLeft();
     }
   }
-  AddToMap(SquareLeft);
+  AddToMap(SQUARE_LEFT);
 }
 
 void SquareUpRight() {  //same as SquareUpLeft but on the right. Directions and comparisons are reversed.
-  float FR = IRSensor(FrontRight);
-  float BR = IRSensor(BackRight);
+  float FR = IRSensor(FRONT_RIGHT);
+  float BR = IRSensor(BACK_RIGHT);
   Square = false;
   TimeOut = 0; //timeout is used to limit the time the robot can spend trying to square up so that it doesn't get caught in a loop when squaring isn't possible.
 
   while (Square == false) {
-    float FR = IRSensor(FrontRight);
-    float BR = IRSensor(BackRight);
-    if (FR > BR + OffSet) {
+    float FR = IRSensor(FRONT_RIGHT);
+    float BR = IRSensor(BACK_RIGHT);
+    if (FR > BR + OFFSET) {
       EncCountA = 0;
       EncCountB = 0;
       MotorADir = 0;
@@ -644,19 +651,19 @@ void SquareUpRight() {  //same as SquareUpLeft but on the right. Directions and 
 
       if (EncCountB < -EncCountA) {
         RampSpeedB(0.0f);
-        RampSpeedA(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
       } else if (EncCountB > -EncCountA) {
-        RampSpeedB(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
         RampSpeedA(0.0f);
       } else if (EncCountB == -EncCountA) {
-        RampSpeedB(SquareSpeed);
-        RampSpeedA(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
+        RampSpeedA(SQUARE_SPEED);
         BothEncCount = EncCountA;
       }
     }
 
 
-    else if (BR > FR + OffSet) {
+    else if (BR > FR + OFFSET) {
       EncCountA = 0;
       EncCountB = 0;
       MotorADir = 1;
@@ -666,13 +673,13 @@ void SquareUpRight() {  //same as SquareUpLeft but on the right. Directions and 
       EncB.rise(&countPulseB);
       if (EncCountA < -EncCountB) {
         RampSpeedA(0.0f);
-        RampSpeedB(SquareSpeed);
+        RampSpeedB(SQUARE_SPEED);
       } else if (EncCountA > -EncCountB) {
-        RampSpeedA(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
         RampSpeedB(0.0f);
       } else if (EncCountA == -EncCountB) {
-        RampSpeedA(SquareSpeed);
-        RampSpeedB(SquareSpeed);
+        RampSpeedA(SQUARE_SPEED);
+        RampSpeedB(SQUARE_SPEED);
         BothEncCount = EncCountA;
       }
     } else {
@@ -689,13 +696,13 @@ void SquareUpRight() {  //same as SquareUpLeft but on the right. Directions and 
       SquareUpLeft();
     }
   }
-  AddToMap(SquareRight);
+  AddToMap(SQUARE_RIGHT);
 }
 
 
 void SquareUp(){ //select whether to square up on the left wall or the right wall based on which one is closer.
-  int LeftWall = (AverageIRSensor(FrontLeft) + AverageIRSensor(BackLeft))/2;
-  int RightWall = (AverageIRSensor(FrontRight) + AverageIRSensor(BackRight))/2;
+  int LeftWall = (AverageIRSensor(FRONT_LEFT) + AverageIRSensor(BACK_LEFT))/2;
+  int RightWall = (AverageIRSensor(FRONT_RIGHT) + AverageIRSensor(BACK_RIGHT))/2;
   if(LeftWall > RightWall){ //if right wall is closer
     SquareUpRight();
   }
@@ -710,11 +717,11 @@ void SquareUp(){ //select whether to square up on the left wall or the right wal
 void RampSpeedA(float SetSpeed){ //function to slowly increase the speed of motor A to a desired final speed.
   float CurrentSpeed = MotorAPwm.read(); //find the current PWM
   if(CurrentSpeed < SetSpeed){ //compare whether current speed is above or below the desired value 
-    CurrentSpeed = CurrentSpeed + Ramp; // if below desired value, increase PWM by the ramp value.
+    CurrentSpeed = CurrentSpeed + RAMP; // if below desired value, increase PWM by the ramp value.
     MotorAPwm.write(CurrentSpeed); //assign new speed.
   }
   else if(CurrentSpeed > SetSpeed){
-    CurrentSpeed = CurrentSpeed - Ramp; //if above desired value, decrease PWM by the ramp value
+    CurrentSpeed = CurrentSpeed - RAMP; //if above desired value, decrease PWM by the ramp value
     MotorAPwm.write(CurrentSpeed); //Assign new speed
   }
   else{
@@ -725,11 +732,11 @@ void RampSpeedA(float SetSpeed){ //function to slowly increase the speed of moto
 void RampSpeedB(float SetSpeed){ //Same as previous function but for wheel B.
   float CurrentSpeed = MotorBPwm.read();
   if(CurrentSpeed < SetSpeed){
-    CurrentSpeed = CurrentSpeed + Ramp;
+    CurrentSpeed = CurrentSpeed + RAMP;
     MotorBPwm.write(CurrentSpeed);
   }
   else if(CurrentSpeed > SetSpeed){
-    CurrentSpeed = CurrentSpeed - Ramp;
+    CurrentSpeed = CurrentSpeed - RAMP;
     MotorBPwm.write(CurrentSpeed);
   }
   else{
@@ -746,7 +753,7 @@ void RampSpeedB(float SetSpeed){ //Same as previous function but for wheel B.
 
 /*Code in this section includes: 
 -Doing a big spin :)
--Flashing the built-in RGB lights on the board. It isn't very vision because of how the robot is made but it adds style.
+-Flashing the built-in RGB lights on the board. It isn't very visible because of how the robot is made but it adds style.
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -812,9 +819,9 @@ void Explore(){
     SquareUp();
     Serial.println("Snitch 4");
 
-    int LeftWall = UltraSensor(Ultra4Pin); //check if there is a wall on the left using ultrasonic.
+    int LeftWall = UltraSensor(ULTRA_4_PIN); //check if there is a wall on the left using ultrasonic.
     int FrontWall = CheckFront();
-    int RightWall = UltraSensor(Ultra2Pin); //check if there is a wall on the right using ultrasonic.
+    int RightWall = UltraSensor(ULTRA_2_PIN); //check if there is a wall on the right using ultrasonic.
     Serial.println("Snitch 5");
     if (FrontWall < 13 || FrontWall > 600){
       Serial.println("Snitch 6");
@@ -823,8 +830,8 @@ void Explore(){
     else{
       if(LeftWall > 30 && LeftWall < 900){ //check if there is a wall on the left using ultrasonic. there isn't
         Serial.println("Snitch 7");
-        float FL = AverageIRSensor(FrontLeft); //check front left ir
-        float BL = AverageIRSensor(BackLeft); //check back left ir
+        float FL = AverageIRSensor(FRONT_LEFT); //check front left ir
+        float BL = AverageIRSensor(BACK_LEFT); //check back left ir
         if(FL > 30 && BL > 30){ //check whether both sensors confirm there is no wall
           Serial.println("Snitch 8");
           TurnLeft(); //if there is a wall close in front, do a small turn to avoid driving into it.
@@ -866,8 +873,8 @@ void Explore(){
           Serial.println("Snitch 15");
           if(RightWall > 20 && RightWall <900){ //check if there is a wall on the Right using ultrasonic. there isn't
             Serial.println("Snitch 16");
-            float FR= AverageIRSensor(FrontRight); //check front Right ir
-            float BR= AverageIRSensor(BackRight); //check back Right ir
+            float FR= AverageIRSensor(FRONT_RIGHT); //check front Right ir
+            float BR= AverageIRSensor(BACK_RIGHT); //check back Right ir
             if(FR> 20 && BR> 20){ //check whether both sensors confirm there is no wall
               Serial.println("Snitch 17");
               TurnRight();
@@ -892,7 +899,7 @@ void Explore(){
             }
           }
           else{ //there is a wall on the left, the front and the right
-            TurnRight();
+            TurnRight(); //turn around 180 degrees
             TurnRight();
           }
         }
@@ -964,16 +971,16 @@ void ReadMap(){
   Serial.println("Map Snitch 5");
   for (byte i = 0; i < 149; i = i + 1) { //goes through each move in the array and prints them out on the serial monitor.
     Serial.println("Map Snitch 6");
-    if(MovesToEnd[i] == Left){
+    if(MovesToEnd[i] == LEFT){
       Serial.println("Left");
     }
-    else if(MovesToEnd[i] == Right){
+    else if(MovesToEnd[i] == RIGHT){
       Serial.println("Right");
     }
-    else if(MovesToEnd[i] == SquareLeft){
+    else if(MovesToEnd[i] == SQUARE_LEFT){
       Serial.println("Squareup Left");
     }
-    else if(MovesToEnd[i] == SquareRight){
+    else if(MovesToEnd[i] == SQUARE_RIGHT){
       Serial.println("Squareup Right");
     }
     else if(MovesToEnd[i] < 0){ // reversing is signified by a negative value.
@@ -981,7 +988,7 @@ void ReadMap(){
       Serial.println(MovesToEnd[i]);
     }
     else{
-      Serial.print("Forward"); // a positive value that is not equal to Left, Right, SquareLeft or SquareRight is a forwards command.
+      Serial.print("Forward"); // a positive value that is not equal to Left, Right, SQUARE_LEFT or SQUARE_RIGHT is a forwards command.
       Serial.println(MovesToEnd[i]);
     }
   }
@@ -991,21 +998,21 @@ void CreateMapBack(){ //function that reverses the map from start to end to crea
   Serial.println("Map Snitch 7");
   for (byte i = 149; i > 0; i = i - 1){
     Serial.println("Map Snitch 8");
-    if(MovesToEnd[i] == Left){ //if it made a left on the way there
-      AddToReverseMap(Right); //make a right on the way back
+    if(MovesToEnd[i] == LEFT){ //if it made a left on the way there
+      AddToReverseMap(RIGHT); //make a right on the way back
     }
-    else if(MovesToEnd[i] == Right){ //if it made a right on the way there
-      AddToReverseMap(Left); //make a left on the way back
+    else if(MovesToEnd[i] == RIGHT){ //if it made a right on the way there
+      AddToReverseMap(LEFT); //make a left on the way back
     }
-    else if(MovesToEnd[i] == SquareLeft){ //when it squares up on the left
-      AddToReverseMap(SquareRight); //square up on the right on the way back
+    else if(MovesToEnd[i] == SQUARE_LEFT){ //when it squares up on the left
+      AddToReverseMap(SQUARE_RIGHT); //square up on the right on the way back
     }
-    else if(MovesToEnd[i] == Right){ //when it squares up right
-      AddToReverseMap(Left); //square up on the left on the way back
+    else if(MovesToEnd[i] == SQUARE_RIGHT){ //when it squares up right
+      AddToReverseMap(SQUARE_LEFT); //square up on the left on the way back
     }
     else if(MovesToEnd[i] < 0){ //when it is reversing
       for (byte j = 1; j < 99; j = j + 1){ //this loop finds the next forwards and then subtracts the reverse from it.
-        if(MovesToEnd[i-j] != Left && MovesToEnd[i-j] != Right && MovesToEnd[i-j] != SquareLeft && MovesToEnd[i-j] != SquareRight){ 
+        if(MovesToEnd[i-j] != LEFT && MovesToEnd[i-j] != RIGHT && MovesToEnd[i-j] != SQUARE_LEFT && MovesToEnd[i-j] != SQUARE_RIGHT){ 
           MovesToEnd[i-j] = MovesToEnd[i-j] + MovesToEnd[i];
           break; //exits the for loop
         }
@@ -1023,16 +1030,16 @@ void FollowMapBack(){ //checks each term in the map back to the start and execut
   TurnRight();
   TurnRight();
   for (byte i = 0; i < 149; i = i + 1){
-    if(MovesBackToStart[i] == Left){
+    if(MovesBackToStart[i] == LEFT){
       TurnLeft();
     }
-    else if(MovesBackToStart[i] == Right){
+    else if(MovesBackToStart[i] == RIGHT){
       TurnRight();
     }
-    else if(MovesBackToStart[i] == SquareLeft){
+    else if(MovesBackToStart[i] == SQUARE_LEFT){
       SquareUpLeft();
     }
-    else if(MovesBackToStart[i] == SquareRight){
+    else if(MovesBackToStart[i] == SQUARE_RIGHT){
       SquareUpRight();
     }
     else{
